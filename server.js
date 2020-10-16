@@ -1,5 +1,7 @@
 const express = require('express')
 const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
+require('dotenv').config()
 const app = express()
 const signUp = express.Router();
 const signIn = express.Router();
@@ -39,6 +41,21 @@ const doctors = [];
 //     password:"hashpassword"
 // }];
 
+const authenticToken = (req, res, next) => {
+    console.log(req.headers)
+    console.log(req.headers["authorization"])
+    const token = req.headers && req.headers["authorization"].split(" ").pop();
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error) => {
+        if (error) {
+            throw error;
+        } else {
+            next();
+            return;
+        }
+    })
+}
+
+
 signUp.post('/', async (req, res) => {
     if (req.body.id.startsWith("2")) {
 
@@ -49,8 +66,15 @@ signUp.post('/', async (req, res) => {
             id: req.body.id,
             emai: req.body.email,
             password: hashpassword,
-        })
-            
+            })
+            const accessToken = jwt.sign({
+                id: req.body.id,
+                email: req.body.email,
+                password: hashpassword,
+            }, process.env.ACCESS_TOKEN_SECRET);  
+            res.json({
+                "accessToken" :accessToken
+            })
         } else {
             res.json("please enter valid id")
         }
@@ -65,10 +89,17 @@ signUp.post('/', async (req, res) => {
             const hashpassword = await bcrypt.hash(req.body.password, 10);
             doctors.push({
             id: req.body.id,
-            emai: req.body.email,
+            email: req.body.email,
             password: hashpassword,
         })
-            
+            const accessToken = jwt.sign({
+                id: req.body.id,
+                email: req.body.email,
+                password: hashpassword,
+            }, process.env.ACCESS_TOKEN_SECRET);
+            res.json({
+                "accessToken":accessToken
+            })
         } else {
             res.json("please enter valid id")
         }
@@ -76,7 +107,7 @@ signUp.post('/', async (req, res) => {
 
         
     }
-    res.status(200).json();
+   
 });
 
 
@@ -113,9 +144,11 @@ signIn.post('/', async (req, res) => {
 })
 
 
-signUp.get('/', (req,res) => {
-    res.json(doctors);
+signUp.get('/',authenticToken , (req,res) => {
+    res.json(students);
 })
+
+
 
 
 
