@@ -1,75 +1,120 @@
 const express = require('express')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
+const {users,courses,loginUsers} =require('./data')
 require('dotenv').config()
 const app = express()
 const signUp = express.Router();
 const signIn = express.Router();
+const courseRoute = express.Router();
 app.use(express.json())
+app.use('/signUp', signUp)
+app.use('/signIn', signIn)
+app.use('/courses',courseRoute)
 
-// id for students begin with 2 
-const students =[]
-    
-//     [{
-//     id: "2234548",
-//     emai: "f.alfuqahaaa@gmail.com",
-//     password:"hashpassword"
-// },{
-//     id: "2234568",
-//     emai: "f.alfuqahaaa@gmail.com",
-//     password:"hashpassword"
-// },{
-//     id: "2234578",
-//     emai: "f.alfuqahaaa@gmail.com",
-//     password:"hashpassword"
-// }];
-
-// id for doctors begin with 1 
-const doctors = [];
-    
-//     [{
-//     id: "1234548",
-//     emai: "f.alfuqahaaa@gmail.com",
-//     password:"hashpassword"
-// },{
-//     id: "1234568",
-//     emai: "f.alfuqahaaa@gmail.com",
-//     password:"hashpassword"
-// },{
-//     id: "1234578",
-//     emai: "f.alfuqahaaa@gmail.com",
-//     password:"hashpassword"
-// }];
+// app.use(setUser)
 
 const authenticToken = (req, res, next) => {
-    console.log(req.headers)
-    console.log(req.headers["authorization"])
     const token = req.headers && req.headers["authorization"].split(" ").pop();
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error) => {
-        if (error) {
-            throw error;
-        } else {
-            next();
-            return;
-        }
-    })
+    const decode = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    if (decode.role==="admin") {
+        next();
+    } else {
+        res.json("Your are not autharize to this action")
+    }
+}
+
+const checkRole = (req, res, next) => {
+    if (req.body.role === "admin") {
+        res.json("you can't add admin user")
+    } else {
+        next();
+    }
 }
 
 
-signUp.post('/', async (req, res) => {
-    if (req.body.id.startsWith("2")) {
 
-        const student = students.find((stud) => stud.id === req.body.id )
-        if (!student) {
+courseRoute.get('/allCourses', (req,res) => {
+    res.json(courses)
+});
+
+courseRoute.get('/myCourses', (req, res) => {
+    const doctorCourse = [];
+    courses.forEach(element => {
+        console.log(req.body.id);
+        console.log(element.idOfInstructor)
+        if (req.body.idOfInstructor === element.idOfInstructor) {
+            doctorCourse.push(element)
+        }
+    });
+    res.json(doctorCourse);
+});
+
+courseRoute.post('/Course', (req,res) => {
+    courses.push(
+        {
+            name: req.body.name,
+             id: req.body.id,
+            idOfInstructor : req.body.idOfInstructor
+        }
+    )
+    res.json("course created")
+});
+
+courseRoute.delete('/Course', (req,res) => {
+    courses.forEach((element,index) => {
+        if (req.body.id === element.id) {
+            courses.splice(index, 1);
+        }
+    });
+    res.json("Done!")
+    
+});
+
+
+courseRoute.put('/Course', (req, res) => {
+    console.log(req.body)
+    courses.forEach((element,index) => {
+        if (req.body.id === element.id) {
+            courses[index]= req.body;
+        }
+    });
+    res.json("Done!")
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// signUp.post('/', checkRole, async (req, res) => {
+signUp.post('/', async (req, res) => {
+
+        const user = users.find((stud) => stud.id === req.body.id )
+        if (!user) {
             const hashpassword = await bcrypt.hash(req.body.password, 10);
-            students.push({
-            id: req.body.id,
-            emai: req.body.email,
-            password: hashpassword,
+            users.push({
+                id: req.body.id,
+                name:req.body.name,
+                role: req.body.role,
+                password: hashpassword,
             })
             const accessToken = jwt.sign({
                 id: req.body.id,
-                email: req.body.email,
+                name:req.body.name,
+                role: req.body.role,
                 password: hashpassword,
             }, process.env.ACCESS_TOKEN_SECRET);  
             res.json({
@@ -79,82 +124,46 @@ signUp.post('/', async (req, res) => {
             res.json("please enter valid id")
         }
        
-
-        
-    }
-    if (req.body.id.startsWith("1")) {
-
-        const doctor = doctors.find((doc) => doc.id === req.body.id )
-        if (!doctor) {
-            const hashpassword = await bcrypt.hash(req.body.password, 10);
-            doctors.push({
-            id: req.body.id,
-            email: req.body.email,
-            password: hashpassword,
-        })
-            const accessToken = jwt.sign({
-                id: req.body.id,
-                email: req.body.email,
-                password: hashpassword,
-            }, process.env.ACCESS_TOKEN_SECRET);
-            res.json({
-                "accessToken":accessToken
-            })
-        } else {
-            res.json("please enter valid id")
-        }
-       
-
-        
-    }
+    } 
    
-});
+);
 
 
 signIn.post('/', async (req, res) => {
-
-    if (req.body.id.startsWith("2")) {
-        const student = students.find((stud) => stud.id === req.body.id )
-        if (!student) {
+    const user = users.find((stud) => stud.id === req.body.id)
+    console.log(user)
+        if (!user) {
             res.json("The id not found")
         } else {
-            if (await bcrypt.compare(req.body.password, student.password)) {
+            console.log(req.body.password)
+            console.log(user.password)
+            if (await bcrypt.compare(req.body.password , user.password)) {
+                loginUsers.push(
+                    {
+                        id: req.body.id,
+                        name:req.body.name,
+                        role: req.body.role,
+                        password: req.body.password,
+                    }
+                )
                 res.json("Sucess")
             } else {
                 res.json("The password incorrect")
             }
         }
 
-        
-        
-    }
-    if (req.body.id.startsWith("1")) {
-        const doctor = doctors.find((doc) => doc.id === req.body.id )
-        if (!doctor) {
-            res.json("The id not found")
-        } else {
-            if (await bcrypt.compare(req.body.password, doctor.password)) {
-                res.json("Sucess")
-            } else {
-                res.json("The password incorrect")
-            }
-        }
-   
-    }
 })
 
-
+// signUp.get('/',authenticToken , (req,res) => {
 signUp.get('/',authenticToken , (req,res) => {
-    res.json(students);
+    res.json(users);
+})
+
+app.get('/loginUsers', authenticToken, (req,res) => {
+    res.json(loginUsers)
 })
 
 
-
-
-
-
-app.use('/signUp', signUp)
-app.use('/signIn',signIn)
 const port = 3000;
 app.listen(port, () => {
     console.log("Hello")
